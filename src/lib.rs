@@ -21,6 +21,13 @@ macro_rules! rotr {
 //const c: usize = 4;  // number of words in a key
 //const t: u32 = 2*(r+1); // table size (26)
 //let S[t]: Word;
+
+#[derive(Debug)]
+enum MagicConst {
+    U16(u16,u16),
+    U32(u32,u32),
+    U64(u64,u64)
+}
     // P = 0xb7e1;                 Q = 0x9e37              // w = 16
     // P = 0xb7e15163;             Q = 0x9e3779b9          // w = 32
     // P = 0xb7e151628aed2a6b;     Q = 0x9e3779b97f4a7c15; // w = 64
@@ -70,7 +77,6 @@ fn expand_key<W, const T: usize>(key: Vec<u8>, p: W, q: W) -> [W;T]
 where
     W: Unsigned + From<u8> + From<u32> + std::marker::Copy + std::fmt::Debug
 {
-
     let mut key_s = [W::from(0u8); T];
     let b = key.len();
     let r = T/2 - 1;
@@ -141,8 +147,10 @@ mod tests {
     	//let key_exp = [0x00010203, 0x04050607, 0x00010203, 0x04050607];
     	let pt  = vec![0x00, 0x11, 0x22, 0x33, 0x44, 0x55, 0x66, 0x77];
     	let ct  = vec![0x2D, 0xDC, 0x14, 0x9B, 0xCF, 0x08, 0x8B, 0x9E];
+        // P = 0xb7e15163;             Q = 0x9e3779b9          // w = 32
         let key_s = expand_key::<u32, 26>(key, 0xb7e15163, 0x9e3779b9);
-    	//let res = encode::<u32, 4>(key_s, [0x0001020304, 0x05060708]);
+    	let res = encode::<u32, 26>(key_s, [0x0001020304, 0x05060708]);
+        println!("{:2x?} {:2x?}", res[0].to_be_bytes(), res[1].to_be_bytes());
     	//assert!(&ct[..] == &res[..]);
     }
 
