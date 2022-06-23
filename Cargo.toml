@@ -6,3 +6,4 @@ edition = "2018"
 
 [dependencies]
 num = "0.4.0"
+num-bytes = "0.4.0"

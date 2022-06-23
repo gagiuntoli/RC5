@@ -1,5 +1,7 @@
 use std::convert::TryInto;
+use std::mem;
 use num;
+use num_bytes;
 
 macro_rules! rotl {
     ($a: expr, $b: expr) => {
@@ -13,17 +15,49 @@ macro_rules! rotr {
     }
 }
 
-// 32/12/16
-//const w: u32 = 32; // word size can be 16, 32, 64
-//const r: u32 = 12; // number of rounds
-//const b: u32 = 16; // key size in bytes
-//const c: usize = 4;  // number of words in a key
-//const t: u32 = 2*(r+1); // table size (26)
-//let S[t]: Word;
+trait IntoBytes: Sized {
+    fn to_le_bytes(a: Self) -> Vec<u8>;
+}
 
-// P = 0xb7e1;                 Q = 0x9e37              // w = 16
-// P = 0xb7e15163;             Q = 0x9e3779b9          // w = 32
-// P = 0xb7e151628aed2a6b;     Q = 0x9e3779b97f4a7c15; // w = 64
+impl IntoBytes for u16 {
+    fn to_le_bytes(a: Self) -> Vec<u8> {
+        a.to_le_bytes().to_vec()
+    }
+}
+
+impl IntoBytes for u32 {
+    fn to_le_bytes(a: Self) -> Vec<u8> {
+        a.to_le_bytes().to_vec()
+    }
+}
+
+impl IntoBytes for u64 {
+    fn to_le_bytes(a: Self) -> Vec<u8> {
+        a.to_le_bytes().to_vec()
+    }
+}
+
+trait FromBytes: Sized {
+    fn from_le_bytes(bytes: &[u8]) -> Option<Self>;
+}
+
+impl FromBytes for u16 {
+    fn from_le_bytes(bytes: &[u8]) -> Option<Self> {
+        bytes.try_into().map(u16::from_le_bytes).ok()
+    }
+}
+
+impl FromBytes for u32 {
+    fn from_le_bytes(bytes: &[u8]) -> Option<Self> {
+        bytes.try_into().map(u32::from_le_bytes).ok()
+    }
+}
+
+impl FromBytes for u64 {
+    fn from_le_bytes(bytes: &[u8]) -> Option<Self> {
+        bytes.try_into().map(u64::from_le_bytes).ok()
+    }
+}
 
 trait Unsigned: num::Unsigned +
                 num::traits::WrappingAdd +
@@ -34,53 +68,68 @@ trait Unsigned: num::Unsigned +
                 std::ops::Shr<Output = Self>
 {
     const BITS: u32;
+    const BYTES: usize;
+    const P: Self;
+    const Q: Self;
 }
 
 impl Unsigned for u16 {
     const BITS: u32 = u16::BITS;
+    const BYTES: usize = 2;
+    const P: Self = 0xb7e1u16;
+    const Q: Self = 0x9e37u16;
 }
 
 impl Unsigned for u32 {
     const BITS: u32 = u32::BITS;
+    const BYTES: usize = 4;
+    const P: Self = 0xb7e15163u32;
+    const Q: Self = 0x9e3779b9u32;
 }
 
 impl Unsigned for u64 {
     const BITS: u32 = u64::BITS;
+    const BYTES: usize = 8;
+    const P: Self = 0xb7e151628aed2a6bu64;
+    const Q: Self = 0x9e3779b97f4a7c15u64;
 }
 
-fn encode<W, const T: usize>(key_exp: [W; T], pt: [W; 2]) -> [W; 2]
+fn encode<W, const T: usize>(key_exp: [W; T], pt: Vec<u8>) -> Vec<u8>
 where
-    W: Unsigned + From<u32> + Copy
+    W: Unsigned + From<u32> + Copy + FromBytes + IntoBytes
 {
     let r = T/2 - 1;
-    let mut a = pt[0] + key_exp[0];
-    let mut b = pt[1] + key_exp[1];
+    let mut a = W::from_le_bytes(pt[0..W::BYTES].try_into().unwrap()).unwrap() + key_exp[0];
+    let mut b = W::from_le_bytes(pt[W::BYTES..2*W::BYTES].try_into().unwrap()).unwrap() + key_exp[1];
     for i in 1..=r {
         a = rotl!(a^b, b) + key_exp[2*i];
         b = rotl!(b^a, a) + key_exp[2*i+1];
     }
-    [a,b]
+    [W::to_le_bytes(a).as_slice(), W::to_le_bytes(b).as_slice()].concat()
 }
 
-fn decode<W, const T: usize>(key_exp: [W; T], ct: [W; 2]) -> [W; 2]
+fn decode<W, const T: usize>(key_exp: [W; T], ct: Vec<u8>) -> Vec<u8>
 where
-    W: Unsigned + From<u32> + Copy
+    W: Unsigned + From<u32> + Copy + FromBytes + IntoBytes
 {
     let r = T/2 - 1;
-    let mut a = ct[0];
-    let mut b = ct[1];
+    //let mut a = ct[0];
+    //let mut b = ct[1];
+    let mut a = W::from_le_bytes(ct[0..W::BYTES].try_into().unwrap()).unwrap();
+    let mut b = W::from_le_bytes(ct[W::BYTES..2*W::BYTES].try_into().unwrap()).unwrap();
     for i in (1..=r).rev() {
         b = rotr!(b-key_exp[2*i+1], a) ^ a;
         a = rotr!(a-key_exp[2*i]  , b) ^ b;
     }
-    [a-key_exp[0], b-key_exp[1]]
+    //[a-key_exp[0], b-key_exp[1]]
+    [W::to_le_bytes(a-key_exp[0]).as_slice(), W::to_le_bytes(b-key_exp[1]).as_slice()].concat()
 }
 
 /*
  * Expands the key to t = 2(r+1) bytes
  */
 #[allow(arithmetic_overflow)]
-fn expand_key<W, const T: usize>(key: Vec<u8>, p: W, q: W) -> [W;T]
+fn expand_key<W, const T: usize>(key: Vec<u8>) -> [W;T]
 where
     W: Unsigned + From<u8> + From<u32> + std::marker::Copy + std::fmt::Debug
 {
@@ -105,9 +154,9 @@ where
     //println!("key_s = {:?}\n", key_s);
     
     // initializing array S
-    key_s[0] = p;
+    key_s[0] = W::P;
     for i in 1..=(T-1) {
-        key_s[i] = key_s[i-1] + q;
+        key_s[i] = key_s[i-1] + W::Q;
     }
     //println!("key_s = {:2x?}\n", key_s);
 
@@ -141,81 +190,53 @@ mod tests {
                        0x08, 0x09, 0x0A, 0x0B, 0x0C, 0x0D, 0x0E, 0x0F];
     	let pt  = vec![0x00, 0x11, 0x22, 0x33, 0x44, 0x55, 0x66, 0x77];
     	let ct  = vec![0x2D, 0xDC, 0x14, 0x9B, 0xCF, 0x08, 0x8B, 0x9E];
-        let key_s = expand_key::<u32,26>(key, 0xb7e15163, 0x9e3779b9);
-    	//let res = encode::<u32, 26>(key_s, [0x00112233, 0x44556677]);
-    	let res = encode::<u32,26>(key_s, [0x33221100, 0x77665544]);
-        println!("{:2x?} {:2x?}", res[0], res[1]);
-        println!("{:2x?}", res[0].to_be_bytes().to_vec().into_iter().rev().collect::<Vec<u8>>());
-    	//assert!(&ct[..] == &res[..]);
+        let key_s = expand_key::<u32,26>(key);
+    	let res = encode::<u32,26>(key_s, pt);
+    	assert!(&ct[..] == &res[..]);
     }
 
     #[test]
     fn encode_b() {
     	let key = vec![0x2B, 0xD6, 0x45, 0x9F, 0x82, 0xC5, 0xB3, 0x00,
                        0x95, 0x2C, 0x49, 0x10, 0x48, 0x81, 0xFF, 0x48];
-    	let pt: Vec<u8> = vec![0xEA, 0x02, 0x47, 0x14, 0xAD, 0x5C, 0x4D, 0x84];
-    	let ct  = vec![0x11, 0xE4, 0x3B, 0x86, 0xD2, 0x31, 0xEA, 0x64];
-        let key_s = expand_key::<u32,26>(key, 0xb7e15163, 0x9e3779b9);
-        println!("e = {:2x?}", (&pt[0..4]).to_vec().into_iter().rev().collect::<Vec<u8>>());
-        //println!("e = {:2x?}", pt[0..4].cloned().into_iter().collect::<Vec<u8>>());
-        //println!("e = {:2x}",u32::from_be_bytes(pt[0..4].to_vec().into_iter().rev().try_into().unwrap()));
-    	let res = encode::<u32,26>(key_s,
-            [u32::from_be_bytes((&pt[0..4]).to_vec().into_iter().rev().collect::<Vec<u8>>().try_into().unwrap()),
-             u32::from_be_bytes((&pt[4..8]).to_vec().into_iter().rev().collect::<Vec<u8>>().try_into().unwrap())
-            ]);
-        println!("encode b {:2x?}", res[0].to_be_bytes().to_vec().into_iter().rev().collect::<Vec<u8>>());
-        println!("encode b {:2x?}", res[1].to_be_bytes().to_vec().into_iter().rev().collect::<Vec<u8>>());
-    	//assert!(&ct[..] == &res[..]);
+    	let pt = vec![0xEA, 0x02, 0x47, 0x14, 0xAD, 0x5C, 0x4D, 0x84];
+    	let ct = vec![0x11, 0xE4, 0x3B, 0x86, 0xD2, 0x31, 0xEA, 0x64];
+        let key_s = expand_key::<u32,26>(key);
+    	let res = encode::<u32,26>(key_s, pt);
+    	assert!(&ct[..] == &res[..]);
     }
 
     #[test]
     fn encode_c() {
     	let key = vec![0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
                        0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00];
-    	//let key_exp = [0x00010203, 0x04050607, 0x00010203, 0x04050607];
     	let pt  = vec![0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00];
-    	let ct  = vec![0x2D, 0xDC, 0x14, 0x9B, 0xCF, 0x08, 0x8B, 0x9E];
-        // P = 0xb7e15163;             Q = 0x9e3779b9          // w = 32
-        let key_s = expand_key::<u32, 26>(key, 0xb7e15163, 0x9e3779b9);
-    	let res = encode::<u32, 26>(key_s, [0x00000000, 0x00000000]);
-        println!("{:2x?} {:2x?}", res[0].to_be_bytes(), res[1].to_be_bytes());
-    	//assert!(&ct[..] == &res[..]);
+    	let ct  = vec![0x21, 0xA5, 0xDB, 0xEE, 0x15, 0x4B, 0x8F, 0x6D];
+        let key_s = expand_key::<u32, 26>(key);
+    	let res = encode::<u32, 26>(key_s, pt);
+    	assert!(&ct[..] == &res[..]);
     }
 
-    //#[test]
-    //fn decode_a() {
-    //	let key = vec![0x00, 0x01, 0x02, 0x03, 0x04, 0x05, 0x06, 0x07, 0x08, 0x09, 0x0A, 0x0B, 0x0C, 0x0D, 0x0E, 0x0F];
-    //	let pt  = vec![0x96, 0x95, 0x0D, 0xDA, 0x65, 0x4A, 0x3D, 0x62];
-    //	let ct  = vec![0x00, 0x11, 0x22, 0x33, 0x44, 0x55, 0x66, 0x77];
-    //	let res = decode(key, ct);
-    //	assert!(&pt[..] == &res[..]);
-    //}
-
-    //#[test]
-    //fn decode_b() {
-    //	let key = vec![0x2B, 0xD6, 0x45, 0x9F, 0x82, 0xC5, 0xB3, 0x00, 0x95, 0x2C, 0x49, 0x10, 0x48, 0x81, 0xFF, 0x48];
-    //	let pt  = vec![0x63, 0x8B, 0x3A, 0x5E, 0xF7, 0x2B, 0x66, 0x3F];
-    //	let ct  = vec![0xEA, 0x02, 0x47, 0x14, 0xAD, 0x5C, 0x4D, 0x84];
-    //	let res = decode(key, ct);
-    //	assert!(&pt[..] == &res[..]);
-    //}
-}
-
-/*
-fn encode_32(key: Vec<u8>, pt: [u32; 2]) -> [u32; 2] {
-	let mut ciphertext = [0; 2];
-    let b = key.len();
-    let r = 16;
-	type word = u32;
-    let mut a = pt[0] + word::from_le_bytes(key[0..4].try_into().unwrap());
-    let mut b = pt[1] + word::from_le_bytes(key[4..8].try_into().unwrap());
-    for i in 1..=r {
-        let ix: usize = 2 * 8 * i;
-        a = rotl!(a^b, b, 32) + word::from_le_bytes(key[(ix)..(ix+4)].try_into().unwrap());
-        b = rotl!(b^a, a, 32) + word::from_le_bytes(key[(ix+4)..(ix+8)].try_into().unwrap());
+    #[test]
+    fn decode_a() {
+    	let key = vec![0x00, 0x01, 0x02, 0x03, 0x04, 0x05, 0x06, 0x07,
+                       0x08, 0x09, 0x0A, 0x0B, 0x0C, 0x0D, 0x0E, 0x0F];
+    	let pt  = vec![0x96, 0x95, 0x0D, 0xDA, 0x65, 0x4A, 0x3D, 0x62];
+    	let ct  = vec![0x00, 0x11, 0x22, 0x33, 0x44, 0x55, 0x66, 0x77];
+        let key_s = expand_key::<u32, 26>(key);
+    	let res = decode(key_s, ct);
+    	assert!(&pt[..] == &res[..]);
     }
-    ciphertext[0] = a;
-    ciphertext[1] = b;
-	ciphertext
+
+    #[test]
+    fn decode_b() {
+    	let key = vec![0x2B, 0xD6, 0x45, 0x9F, 0x82, 0xC5, 0xB3, 0x00,
+                       0x95, 0x2C, 0x49, 0x10, 0x48, 0x81, 0xFF, 0x48];
+    	let pt  = vec![0x63, 0x8B, 0x3A, 0x5E, 0xF7, 0x2B, 0x66, 0x3F];
+    	let ct  = vec![0xEA, 0x02, 0x47, 0x14, 0xAD, 0x5C, 0x4D, 0x84];
+        let key_s = expand_key::<u32, 26>(key);
+    	let res = decode(key_s, ct);
+    	assert!(&pt[..] == &res[..]);
+    }
 }
-*/
+
