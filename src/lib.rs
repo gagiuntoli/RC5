@@ -3,57 +3,13 @@ use num;
 
 macro_rules! rotl {
     ($a: expr, $b: expr) => {
-        ($a<<($b&W::from(W::BITS-1))) | ($a>>(W::from(W::BITS)-($b&W::from(W::BITS-1))))
+        ($a<<($b&(W::BITS-W::ONE))) | ($a>>((W::BITS)-($b&(W::BITS-W::ONE))))
     }
 }
 
 macro_rules! rotr {
     ($a: expr, $b: expr) => {
-        ($a>>($b&W::from(W::BITS-1))) | ($a<<(W::from(W::BITS)-($b&W::from(W::BITS-1))))
-    }
-}
-
-pub trait IntoBytes: Sized {
-    fn to_le_bytes(a: Self) -> Vec<u8>;
-}
-
-impl IntoBytes for u16 {
-    fn to_le_bytes(a: Self) -> Vec<u8> {
-        a.to_le_bytes().to_vec()
-    }
-}
-
-impl IntoBytes for u32 {
-    fn to_le_bytes(a: Self) -> Vec<u8> {
-        a.to_le_bytes().to_vec()
-    }
-}
-
-impl IntoBytes for u64 {
-    fn to_le_bytes(a: Self) -> Vec<u8> {
-        a.to_le_bytes().to_vec()
-    }
-}
-
-pub trait FromBytes: Sized {
-    fn from_le_bytes(bytes: &[u8]) -> Option<Self>;
-}
-
-impl FromBytes for u16 {
-    fn from_le_bytes(bytes: &[u8]) -> Option<Self> {
-        bytes.try_into().map(u16::from_le_bytes).ok()
-    }
-}
-
-impl FromBytes for u32 {
-    fn from_le_bytes(bytes: &[u8]) -> Option<Self> {
-        bytes.try_into().map(u32::from_le_bytes).ok()
-    }
-}
-
-impl FromBytes for u64 {
-    fn from_le_bytes(bytes: &[u8]) -> Option<Self> {
-        bytes.try_into().map(u64::from_le_bytes).ok()
+        ($a>>($b&(W::BITS-W::ONE))) | ($a<<((W::BITS)-($b&(W::BITS-W::ONE))))
     }
 }
 
@@ -63,42 +19,81 @@ pub trait Unsigned: num::Unsigned +
                 std::ops::BitOr<Output = Self> +
                 std::ops::BitXor<Output = Self> +
                 std::ops::Shl<Output = Self> +
-                std::ops::Shr<Output = Self>
+                std::ops::Shr<Output = Self> +
+                From<u8> + Copy
 {
-    const BITS: u32;
+    const BITS: Self;
     const BYTES: usize;
     const ZERO: Self;
+    const ONE: Self;
+    const THREE: Self;
+    const EIGHT: Self;
     const P: Self;
     const Q: Self;
+    fn from_le_bytes(bytes: &[u8]) -> Option<Self>;
+    fn to_le_bytes(a: Self) -> Vec<u8>;
 }
 
 impl Unsigned for u16 {
-    const BITS: u32 = u16::BITS;
+    const BITS: Self = u16::BITS as Self;
     const BYTES: usize = 2;
     const ZERO: Self = 0u16;
+    const ONE: Self = 1u16;
+    const THREE: Self = 3u16;
+    const EIGHT: Self = 8u16;
     const P: Self = 0xb7e1u16;
     const Q: Self = 0x9e37u16;
+
+    fn from_le_bytes(bytes: &[u8]) -> Option<Self> {
+        bytes.try_into().map(u16::from_le_bytes).ok()
+    }
+
+    fn to_le_bytes(a: Self) -> Vec<u8> {
+        a.to_le_bytes().to_vec()
+    }
 }
 
 impl Unsigned for u32 {
-    const BITS: u32 = u32::BITS;
+    const BITS: Self = u32::BITS as Self;
     const BYTES: usize = 4;
     const ZERO: Self = 0u32;
+    const ONE: Self = 1u32;
+    const THREE: Self = 3u32;
+    const EIGHT: Self = 8u32;
     const P: Self = 0xb7e15163u32;
     const Q: Self = 0x9e3779b9u32;
+
+    fn from_le_bytes(bytes: &[u8]) -> Option<Self> {
+        bytes.try_into().map(u32::from_le_bytes).ok()
+    }
+
+    fn to_le_bytes(a: Self) -> Vec<u8> {
+        a.to_le_bytes().to_vec()
+    }
 }
 
 impl Unsigned for u64 {
-    const BITS: u32 = u64::BITS;
+    const BITS: Self = u64::BITS as Self;
     const BYTES: usize = 8;
     const ZERO: Self = 0u64;
+    const ONE: Self = 1u64;
+    const THREE: Self = 3u64;
+    const EIGHT: Self = 8u64;
     const P: Self = 0xb7e151628aed2a6bu64;
     const Q: Self = 0x9e3779b97f4a7c15u64;
+
+    fn from_le_bytes(bytes: &[u8]) -> Option<Self> {
+        bytes.try_into().map(u64::from_le_bytes).ok()
+    }
+
+    fn to_le_bytes(a: Self) -> Vec<u8> {
+        a.to_le_bytes().to_vec()
+    }
 }
 
 pub fn encode<W, const T: usize>(key: Vec<u8>, pt: Vec<u8>) -> Vec<u8>
 where
-    W: Unsigned + From<u8> + From<u32> + Copy + FromBytes + IntoBytes
+    W: Unsigned
 {
     let key_exp = expand_key::<W,T>(key);
     let r = T/2 - 1;
@@ -113,7 +108,7 @@ where
 
 pub fn decode<W, const T: usize>(key: Vec<u8>, ct: Vec<u8>) -> Vec<u8>
 where
-    W: Unsigned + From<u8> + From<u32> + Copy + FromBytes + IntoBytes
+    W: Unsigned
 {
     let key_exp = expand_key::<W,T>(key);
     let r = T/2 - 1;
@@ -131,7 +126,7 @@ where
  */
 pub fn expand_key<W, const T: usize>(key: Vec<u8>) -> [W;T]
 where
-    W: Unsigned + From<u8> + From<u32> + Copy
+    W: Unsigned
 {
     let mut key_s = [W::ZERO; T];
     let b = key.len();
@@ -143,10 +138,10 @@ where
 
     // converting the secrey key from bytes to words
     let mut key_l = [W::ZERO; 100];
-    let u = (W::BITS / 8) as usize;
+    let u = W::BYTES as usize;
     for i in (0..=(b-1)).rev() {
         let ix = (i/u) as usize;
-        key_l[ix] = (key_l[ix]<<W::from(8u8)).wrapping_add(&W::from(key[i]));
+        key_l[ix] = (key_l[ix]<<W::EIGHT).wrapping_add(&W::from(key[i]));
     }
     
     // initializing array S
@@ -161,7 +156,7 @@ where
     let mut a = W::ZERO;
     let mut b = W::ZERO;
     for _k in 0..std::cmp::max(c, 3*T) {
-        key_s[i] = rotl!((key_s[i] + (a + b)), W::from(3u32));
+        key_s[i] = rotl!((key_s[i] + (a + b)), W::THREE);
         a = key_s[i];
         key_l[j] = rotl!((key_l[j] + (a + b)), (a + b));
         b = key_l[j];
