@@ -1,14 +1,37 @@
-Mintlayer cryptography based recruitment test
+# RC5 block-cipher in Rust
 
-The purpose of this test is to implement a simple cipher in the form of rc5. 
+Library implementation of the basic RC5 block cipher in Rust. RC5 is different
+from the classical ciphers (like AES) in the sense that allow to parametrize
+the algorithm to optimize security and efficiency for different hardware.
 
-Rivest describes the rc5 cipher here https://www.grc.com/r&d/rc5.pdf and includes a c reference implementation.
+These parameters are:
 
-For this test we ask that you implement rc5 in rust. Specifically rc5-32/12/16 for which we have included some test case, 
-feel free to expand and implement other versions of rc5 too if you wish. The test cases provided should pass. 
-Further test cases can be found here https://tools.ietf.org/id/draft-krovetz-rc6-rc5-vectors-00.html#rfc.section.4
+* word length `w` (in bytes)
+* number of rounds `r`
+* key length `b` (in bytes)
 
-Feel free to change the function stubs to accept different arguments or to return something else but remember to change the
-test cases if you do so. The code provided here is just a starting block.
+The selection of each of them should be preferably done by choosing standards
+from other use cases. For example the word length `w` could be any number of
+bytes but the recommendation for performance and security is that should be a
+power of 2, or even better, a power of 8. This RC5 implementation implements
+only the standard values of `w` (powers of 8) making use of the standard Rust
+types: u16, u32, u64, u128.
 
-We'll be looking at your code to see how well you can follow a specification, to see if you can write idiomatic rust and to see if you can write bug-free maintainable code.
+## Error Handling
+
+Since a cipher should be efficient and secure the way we handle errors is
+through panicking. This means that when something unexpected happens during the
+program execution, e.g. a bad length in an array we stop the program calling
+the `panic!` macro. The users of this library need to have this into account
+when they pass arguments to this library.
+
+## TODO
+[] Performance tests
+[] Running with debug mode (needs overflow handling of unsigned types)
+[] Add test cases for `w` = u16, u64, u128
+
+## Bibliography
+
+* Rivest original paper: https://www.grc.com/r&d/rc5.pdf
+* C implementation and tests: https://tools.ietf.org/id/draft-krovetz-rc6-rc5-vectors-00.html#rfc.section.4
+

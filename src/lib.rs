@@ -23,6 +23,7 @@ pub trait Unsigned: num::Unsigned +
                 From<u8> + Copy
 {
     const BITS: Self;
+    const BITSU32: u32;
     const BYTES: usize;
     const ZERO: Self;
     const ONE: Self;
@@ -36,6 +37,7 @@ pub trait Unsigned: num::Unsigned +
 
 impl Unsigned for u16 {
     const BITS: Self = u16::BITS as Self;
+    const BITSU32: u32 = u16::BITS;
     const BYTES: usize = 2;
     const ZERO: Self = 0u16;
     const ONE: Self = 1u16;
@@ -45,7 +47,7 @@ impl Unsigned for u16 {
     const Q: Self = 0x9e37u16;
 
     fn from_le_bytes(bytes: &[u8]) -> Option<Self> {
-        bytes.try_into().map(u16::from_le_bytes).ok()
+        bytes.try_into().map(Self::from_le_bytes).ok()
     }
 
     fn to_le_bytes(a: Self) -> Vec<u8> {
@@ -55,6 +57,7 @@ impl Unsigned for u16 {
 
 impl Unsigned for u32 {
     const BITS: Self = u32::BITS as Self;
+    const BITSU32: u32 = u32::BITS;
     const BYTES: usize = 4;
     const ZERO: Self = 0u32;
     const ONE: Self = 1u32;
@@ -74,6 +77,7 @@ impl Unsigned for u32 {
 
 impl Unsigned for u64 {
     const BITS: Self = u64::BITS as Self;
+    const BITSU32: u32 = u64::BITS;
     const BYTES: usize = 8;
     const ZERO: Self = 0u64;
     const ONE: Self = 1u64;
@@ -96,7 +100,7 @@ where
     W: Unsigned
 {
     let key_exp = expand_key::<W,T>(key);
-    let r = T/2 - 1;
+    let r = T/2-1;
     let mut a = W::from_le_bytes(pt[0..W::BYTES].try_into().unwrap()).unwrap() + key_exp[0];
     let mut b = W::from_le_bytes(pt[W::BYTES..2*W::BYTES].try_into().unwrap()).unwrap() + key_exp[1];
     for i in 1..=r {
@@ -133,11 +137,11 @@ where
 
     // c = max(1, ceil(8*b/w))
     let c = (std::cmp::max(
-            1, (8*key.len() + u32::BITS as usize - 1) as u32 / u32::BITS)
-            ) as usize;
+            1, (8*key.len() + (W::BITSU32 - 1) as usize) as u32 / W::BITSU32
+            )) as usize;
 
     // converting the secrey key from bytes to words
-    let mut key_l = [W::ZERO; 100];
+    let mut key_l = vec![W::ZERO; c];
     let u = W::BYTES as usize;
     for i in (0..=(b-1)).rev() {
         let ix = (i/u) as usize;
@@ -155,7 +159,7 @@ where
     let mut j = 0;
     let mut a = W::ZERO;
     let mut b = W::ZERO;
-    for _k in 0..std::cmp::max(c, 3*T) {
+    for _k in 0..3*std::cmp::max(c, T) {
         key_s[i] = rotl!((key_s[i] + (a + b)), W::THREE);
         a = key_s[i];
         key_l[j] = rotl!((key_l[j] + (a + b)), (a + b));
@@ -223,6 +227,19 @@ mod tests {
     	let pt  = vec![0x2F, 0x42, 0xB3, 0xB7, 0x03, 0x69, 0xFC, 0x92];
     	let ct  = vec![0x65, 0xC1, 0x78, 0xB2, 0x84, 0xD1, 0x97, 0xCC];
     	let res = encode::<u32, 26>(key, pt);
+    	assert!(&ct[..] == &res[..]);
+    }
+
+    #[test]
+    fn encode_16_16_8() {
+        // https://tools.ietf.org/id/draft-krovetz-rc6-rc5-vectors-00.html#rfc.section.4
+        // Key:          0001020304050607
+        // Block input:  00010203
+        // Block output: 23A8D72E
+    	let key = vec![0x00, 0x01, 0x02, 0x03, 0x04, 0x05, 0x06, 0x07];
+    	let pt  = vec![0x00, 0x01, 0x02, 0x03];
+    	let ct  = vec![0x23, 0xA8, 0xD7, 0x2E];
+    	let res = encode::<u16, 34>(key, pt);
     	assert!(&ct[..] == &res[..]);
     }
 
