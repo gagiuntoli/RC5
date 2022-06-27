@@ -15,7 +15,7 @@ from other use cases. For example the word length `w` could be any number of
 bytes but the recommendation for performance and security is that should be a
 power of 2, or even better, a power of 8. This RC5 implementation implements
 only the standard values of `w` (powers of 8) making use of the standard Rust
-types: u16, u32, u64, u128.
+types: u8, u16, u32, u64, u128.
 
 ## Error Handling
 
@@ -26,12 +26,14 @@ the `panic!` macro. The users of this library need to have this into account
 when they pass arguments to this library.
 
 ## TODO
-[] Performance tests
+[x] Add test cases for `w` = u8, u16, u64, u128
 [] Running with debug mode (needs overflow handling of unsigned types)
-[] Add test cases for `w` = u16, u64, u128
+[] Reorganize the code in a proper module structure
+[] Performance tests
 
 ## Bibliography
 
 * Rivest original paper: https://www.grc.com/r&d/rc5.pdf
 * C implementation and tests: https://tools.ietf.org/id/draft-krovetz-rc6-rc5-vectors-00.html#rfc.section.4
+* Haskell implementation: https://hackage.haskell.org/package/cipher-rc5-0.1.0.2/docs/src/Crypto-Cipher-RC5.html
 

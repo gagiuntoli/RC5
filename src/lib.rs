@@ -35,6 +35,26 @@ pub trait Unsigned: num::Unsigned +
     fn to_le_bytes(a: Self) -> Vec<u8>;
 }
 
+impl Unsigned for u8 {
+    const BITS: Self = u8::BITS as Self;
+    const BITSU32: u32 = u8::BITS;
+    const BYTES: usize = 1;
+    const ZERO: Self = 0u8;
+    const ONE: Self = 1u8;
+    const THREE: Self = 3u8;
+    const EIGHT: Self = 8u8;
+    const P: Self = 0xb7u8;
+    const Q: Self = 0x9fu8;
+
+    fn from_le_bytes(bytes: &[u8]) -> Option<Self> {
+        bytes.try_into().map(Self::from_le_bytes).ok()
+    }
+
+    fn to_le_bytes(a: Self) -> Vec<u8> {
+        a.to_le_bytes().to_vec()
+    }
+}
+
 impl Unsigned for u16 {
     const BITS: Self = u16::BITS as Self;
     const BITSU32: u32 = u16::BITS;
@@ -67,7 +87,7 @@ impl Unsigned for u32 {
     const Q: Self = 0x9e3779b9u32;
 
     fn from_le_bytes(bytes: &[u8]) -> Option<Self> {
-        bytes.try_into().map(u32::from_le_bytes).ok()
+        bytes.try_into().map(Self::from_le_bytes).ok()
     }
 
     fn to_le_bytes(a: Self) -> Vec<u8> {
@@ -87,7 +107,27 @@ impl Unsigned for u64 {
     const Q: Self = 0x9e3779b97f4a7c15u64;
 
     fn from_le_bytes(bytes: &[u8]) -> Option<Self> {
-        bytes.try_into().map(u64::from_le_bytes).ok()
+        bytes.try_into().map(Self::from_le_bytes).ok()
+    }
+
+    fn to_le_bytes(a: Self) -> Vec<u8> {
+        a.to_le_bytes().to_vec()
+    }
+}
+
+impl Unsigned for u128 {
+    const BITS: Self = u128::BITS as Self;
+    const BITSU32: u32 = u128::BITS;
+    const BYTES: usize = 16;
+    const ZERO: Self = 0u128;
+    const ONE: Self = 1u128;
+    const THREE: Self = 3u128;
+    const EIGHT: Self = 8u128;
+    const P: Self = 0xb7e151628aed2a6abf7158809cf4f3c7u128;
+    const Q: Self = 0x9e3779b97f4a7c15f39cc0605cedc835u128;
+
+    fn from_le_bytes(bytes: &[u8]) -> Option<Self> {
+        bytes.try_into().map(Self::from_le_bytes).ok()
     }
 
     fn to_le_bytes(a: Self) -> Vec<u8> {
@@ -96,8 +136,7 @@ impl Unsigned for u64 {
 }
 
 pub fn encode<W, const T: usize>(key: Vec<u8>, pt: Vec<u8>) -> Vec<u8>
-where
-    W: Unsigned
+    where W: Unsigned
 {
     let key_exp = expand_key::<W,T>(key);
     let r = T/2-1;
@@ -111,8 +150,7 @@ where
 }
 
 pub fn decode<W, const T: usize>(key: Vec<u8>, ct: Vec<u8>) -> Vec<u8>
-where
-    W: Unsigned
+    where W: Unsigned
 {
     let key_exp = expand_key::<W,T>(key);
     let r = T/2 - 1;
@@ -129,8 +167,7 @@ where
  * Expands the key to t = 2(r+1) bytes
  */
 pub fn expand_key<W, const T: usize>(key: Vec<u8>) -> [W;T]
-where
-    W: Unsigned
+    where W: Unsigned
 {
     let mut key_s = [W::ZERO; T];
     let b = key.len();
@@ -175,6 +212,8 @@ where
 #[cfg(test)]
 mod tests {
 	use super::*;
+
+    /* Mintlayer tests */
 
     #[test]
     fn encode_a() {
@@ -231,19 +270,6 @@ mod tests {
     }
 
     #[test]
-    fn encode_16_16_8() {
-        // https://tools.ietf.org/id/draft-krovetz-rc6-rc5-vectors-00.html#rfc.section.4
-        // Key:          0001020304050607
-        // Block input:  00010203
-        // Block output: 23A8D72E
-    	let key = vec![0x00, 0x01, 0x02, 0x03, 0x04, 0x05, 0x06, 0x07];
-    	let pt  = vec![0x00, 0x01, 0x02, 0x03];
-    	let ct  = vec![0x23, 0xA8, 0xD7, 0x2E];
-    	let res = encode::<u16, 34>(key, pt);
-    	assert!(&ct[..] == &res[..]);
-    }
-
-    #[test]
     fn decode_a() {
     	let key = vec![0x00, 0x01, 0x02, 0x03, 0x04, 0x05, 0x06, 0x07, 0x08, 0x09, 0x0A, 0x0B, 0x0C, 0x0D, 0x0E, 0x0F];
     	let pt  = vec![0x96, 0x95, 0x0D, 0xDA, 0x65, 0x4A, 0x3D, 0x62];
@@ -296,4 +322,154 @@ mod tests {
     	let res = decode::<u32, 26>(key, ct);
     	assert!(&pt[..] == &res[..]);
     }
+
+    /* Test cases from
+       https://tools.ietf.org/id/draft-krovetz-rc6-rc5-vectors-00.html#rfc.section.4
+       */
+
+    #[test]
+    fn encode_8_12_4() {
+        // RC5-8/12/4
+        // Key:          00010203
+        // Block input:  0001
+        // Block output: 212A
+    	let key = vec![0x00, 0x01, 0x02, 0x03];
+    	let pt  = vec![0x00, 0x01];
+    	let ct  = vec![0x21, 0x2A];
+    	let res = encode::<u8, 26>(key, pt);
+    	assert!(&ct[..] == &res[..]);
+    }
+
+    #[test]
+    fn encode_16_16_8() {
+        // RC5-16/16/8
+        // Key:          0001020304050607
+        // Block input:  00010203
+        // Block output: 23A8D72E
+    	let key = vec![0x00, 0x01, 0x02, 0x03, 0x04, 0x05, 0x06, 0x07];
+    	let pt  = vec![0x00, 0x01, 0x02, 0x03];
+    	let ct  = vec![0x23, 0xA8, 0xD7, 0x2E];
+    	let res = encode::<u16, 34>(key, pt);
+    	assert!(&ct[..] == &res[..]);
+    }
+
+    #[test]
+    fn encode_32_20_16() {
+        // RC5-32/20/16
+        // Key:          000102030405060708090A0B0C0D0E0F
+        // Block input:  0001020304050607
+        // Block output: 2A0EDC0E9431FF73
+    	let key = vec![0x00, 0x01, 0x02, 0x03, 0x04, 0x05, 0x06, 0x07, 0x08, 0x09, 0x0A, 0x0B, 0x0C, 0x0D, 0x0E, 0x0F];
+    	let pt  = vec![0x00, 0x01, 0x02, 0x03, 0x04, 0x05, 0x06, 0x07];
+    	let ct  = vec![0x2A, 0x0E, 0xDC, 0x0E, 0x94, 0x31, 0xFF, 0x73
+];
+    	let res = encode::<u32, 42>(key, pt);
+    	assert!(&ct[..] == &res[..]);
+    }
+
+    #[test]
+    fn encode_64_24_24() {
+        // RC5-64/24/24
+        // Key:          000102030405060708090A0B0C0D0E0F1011121314151617
+        // Block input:  000102030405060708090A0B0C0D0E0F
+        // Block output: A46772820EDBCE0235ABEA32AE7178DA
+    	let key = vec![0x00, 0x01, 0x02, 0x03, 0x04, 0x05, 0x06, 0x07, 0x08, 0x09, 0x0A, 0x0B, 0x0C, 0x0D, 0x0E, 0x0F,
+                       0x10, 0x11, 0x12, 0x13, 0x14, 0x15, 0x16, 0x17];
+    	let pt  = vec![0x00, 0x01, 0x02, 0x03, 0x04, 0x05, 0x06, 0x07, 0x08, 0x09, 0x0A, 0x0B, 0x0C, 0x0D, 0x0E, 0x0F];
+    	let ct  = vec![0xA4, 0x67, 0x72, 0x82, 0x0E, 0xDB, 0xCE, 0x02, 0x35, 0xAB, 0xEA, 0x32, 0xAE, 0x71, 0x78, 0xDA];
+    	let res = encode::<u64, 50>(key, pt);
+    	assert!(&ct[..] == &res[..]);
+    }
+
+    #[test]
+    fn encode_128_28_32() {
+        // RC5-128/28/32
+        // Key:          000102030405060708090A0B0C0D0E0F
+        //               101112131415161718191A1B1C1D1E1F
+        // Block input:  000102030405060708090A0B0C0D0E0F
+        //               101112131415161718191A1B1C1D1E1F
+        // Block output: ECA5910921A4F4CFDD7AD7AD20A1FCBA
+        //               068EC7A7CD752D68FE914B7FE180B440
+    	let key = vec![0x00, 0x01, 0x02, 0x03, 0x04, 0x05, 0x06, 0x07, 0x08, 0x09, 0x0A, 0x0B, 0x0C, 0x0D, 0x0E, 0x0F,
+                       0x10, 0x11, 0x12, 0x13, 0x14, 0x15, 0x16, 0x17, 0x18, 0x19, 0x1A, 0x1B, 0x1C, 0x1D, 0x1E, 0x1F];
+    	let pt  = vec![0x00, 0x01, 0x02, 0x03, 0x04, 0x05, 0x06, 0x07, 0x08, 0x09, 0x0A, 0x0B, 0x0C, 0x0D, 0x0E, 0x0F,
+                       0x10, 0x11, 0x12, 0x13, 0x14, 0x15, 0x16, 0x17, 0x18, 0x19, 0x1A, 0x1B, 0x1C, 0x1D, 0x1E, 0x1F];
+    	let ct  = vec![0xEC, 0xA5, 0x91, 0x09, 0x21, 0xA4, 0xF4, 0xCF, 0xDD, 0x7A, 0xD7, 0xAD, 0x20, 0xA1, 0xFC, 0xBA,
+                       0x06, 0x8E, 0xC7, 0xA7, 0xCD, 0x75, 0x2D, 0x68, 0xFE, 0x91, 0x4B, 0x7F, 0xE1, 0x80, 0xB4, 0x40];
+    	let res = encode::<u128, 58>(key, pt);
+    	assert!(&ct[..] == &res[..]);
+    }
+
+    #[test]
+    fn decode_16_16_8() {
+        // RC5-16/16/8
+        // Key:          0001020304050607
+        // Block input:  00010203
+        // Block output: 23A8D72E
+    	let key = vec![0x00, 0x01, 0x02, 0x03, 0x04, 0x05, 0x06, 0x07];
+    	let pt  = vec![0x00, 0x01, 0x02, 0x03];
+    	let ct  = vec![0x23, 0xA8, 0xD7, 0x2E];
+    	let res = decode::<u16, 34>(key, ct);
+    	assert!(&pt[..] == &res[..]);
+    }
+
+    #[test]
+    fn decode_8_12_4() {
+        // Key:          00010203
+        // Block input:  0001
+        // Block output: 212A
+    	let key = vec![0x00, 0x01, 0x02, 0x03];
+    	let pt  = vec![0x00, 0x01];
+    	let ct  = vec![0x21, 0x2A];
+    	let res = decode::<u8, 26>(key, ct);
+    	assert!(&pt[..] == &res[..]);
+    }
+
+    #[test]
+    fn decode_32_20_16() {
+        // RC5-32/20/16
+        // Key:          000102030405060708090A0B0C0D0E0F
+        // Block input:  0001020304050607
+        // Block output: 2A0EDC0E9431FF73
+    	let key = vec![0x00, 0x01, 0x02, 0x03, 0x04, 0x05, 0x06, 0x07, 0x08, 0x09, 0x0A, 0x0B, 0x0C, 0x0D, 0x0E, 0x0F];
+    	let pt  = vec![0x00, 0x01, 0x02, 0x03, 0x04, 0x05, 0x06, 0x07];
+    	let ct  = vec![0x2A, 0x0E, 0xDC, 0x0E, 0x94, 0x31, 0xFF, 0x73
+];
+    	let res = decode::<u32, 42>(key, ct);
+    	assert!(&pt[..] == &res[..]);
+    }
+
+    #[test]
+    fn decode_64_24_24() {
+        // RC5-64/24/24
+        // Key:          000102030405060708090A0B0C0D0E0F1011121314151617
+        // Block input:  000102030405060708090A0B0C0D0E0F
+        // Block output: A46772820EDBCE0235ABEA32AE7178DA
+    	let key = vec![0x00, 0x01, 0x02, 0x03, 0x04, 0x05, 0x06, 0x07, 0x08, 0x09, 0x0A, 0x0B, 0x0C, 0x0D, 0x0E, 0x0F,
+                       0x10, 0x11, 0x12, 0x13, 0x14, 0x15, 0x16, 0x17];
+    	let pt  = vec![0x00, 0x01, 0x02, 0x03, 0x04, 0x05, 0x06, 0x07, 0x08, 0x09, 0x0A, 0x0B, 0x0C, 0x0D, 0x0E, 0x0F];
+    	let ct  = vec![0xA4, 0x67, 0x72, 0x82, 0x0E, 0xDB, 0xCE, 0x02, 0x35, 0xAB, 0xEA, 0x32, 0xAE, 0x71, 0x78, 0xDA];
+    	let res = decode::<u64, 50>(key, ct);
+    	assert!(&pt[..] == &res[..]);
+    }
+
+    #[test]
+    fn decode_128_28_32() {
+        // RC5-128/28/32
+        // Key:          000102030405060708090A0B0C0D0E0F
+        //               101112131415161718191A1B1C1D1E1F
+        // Block input:  000102030405060708090A0B0C0D0E0F
+        //               101112131415161718191A1B1C1D1E1F
+        // Block output: ECA5910921A4F4CFDD7AD7AD20A1FCBA
+        //               068EC7A7CD752D68FE914B7FE180B440
+    	let key = vec![0x00, 0x01, 0x02, 0x03, 0x04, 0x05, 0x06, 0x07, 0x08, 0x09, 0x0A, 0x0B, 0x0C, 0x0D, 0x0E, 0x0F,
+                       0x10, 0x11, 0x12, 0x13, 0x14, 0x15, 0x16, 0x17, 0x18, 0x19, 0x1A, 0x1B, 0x1C, 0x1D, 0x1E, 0x1F];
+    	let pt  = vec![0x00, 0x01, 0x02, 0x03, 0x04, 0x05, 0x06, 0x07, 0x08, 0x09, 0x0A, 0x0B, 0x0C, 0x0D, 0x0E, 0x0F,
+                       0x10, 0x11, 0x12, 0x13, 0x14, 0x15, 0x16, 0x17, 0x18, 0x19, 0x1A, 0x1B, 0x1C, 0x1D, 0x1E, 0x1F];
+    	let ct  = vec![0xEC, 0xA5, 0x91, 0x09, 0x21, 0xA4, 0xF4, 0xCF, 0xDD, 0x7A, 0xD7, 0xAD, 0x20, 0xA1, 0xFC, 0xBA,
+                       0x06, 0x8E, 0xC7, 0xA7, 0xCD, 0x75, 0x2D, 0x68, 0xFE, 0x91, 0x4B, 0x7F, 0xE1, 0x80, 0xB4, 0x40];
+    	let res = decode::<u128, 58>(key, ct);
+    	assert!(&pt[..] == &res[..]);
+    }
 }
+
