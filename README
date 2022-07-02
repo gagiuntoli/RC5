@@ -25,10 +25,18 @@ program execution, e.g. a bad length in an array we stop the program calling
 the `panic!` macro. The users of this library need to have this into account
 when they pass arguments to this library.
 
+# Testing
+
+The application can only run in release mode in order to allow arithmetic overflow
+in the operations:
+
+```
+cargo run --release
+```
+
 ## TODO
 [x] Add test cases for `w` = u8, u16, u64, u128
-[] Running with debug mode (needs overflow handling of unsigned types)
-[] Reorganize the code in a proper module structure
+[x] Reorganize the code in a proper module structure
 [] Performance tests
 
 ## Bibliography
