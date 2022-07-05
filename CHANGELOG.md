@@ -1,3 +1,9 @@
+05.07.2022
+
+* Pulling apart code encode/decode into main kernel.
+* Separating the code into an `unsigned` crate where 
+  we defined the `Unsigned` trait.
+
 27.06.2022
 
 * Fixing error in `expand_key` (key expansion algorithm)

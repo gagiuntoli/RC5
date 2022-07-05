@@ -35,8 +35,6 @@ cargo run --release
 ```
 
 ## TODO
-[x] Add test cases for `w` = u8, u16, u64, u128
-[x] Reorganize the code in a proper module structure
 [] Performance tests
 
 ## Bibliography
