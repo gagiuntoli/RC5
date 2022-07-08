@@ -1,3 +1,10 @@
+//!
+//! # RC5 block-cipher
+//!
+//! `rc5` is a crate to encrypt and decrypt messages using the RC5 algorithm:
+//!  https://www.grc.com/r&d/rc5.pdf
+//! 
+
 #![feature(test)]
 extern crate test;
 
@@ -17,6 +24,22 @@ macro_rules! rotr {
     }
 }
 
+///
+/// Encrypts a plaintext `pt` and returns a ciphertext `ct`.
+/// The `pt` should have length 2 * w = 2 * bytes(W)
+/// 
+/// W: is the data type. Currently supported: u8, u16, u32, u64, u128
+/// T: is the key expansion length T = 2 * (r + 1) being r number of rounds. T
+/// should be even.
+///
+/// Example:
+///
+/// let key = vec![0x00, 0x01, 0x02, 0x03];
+/// let pt  = vec![0x00, 0x01];
+/// let ct  = vec![0x21, 0x2A];
+/// let res = encode::<u8, 26>(key, pt);
+/// assert!(&ct[..] == &res[..]);
+/// 
 pub fn encode<W, const T: usize>(key: Vec<u8>, pt: Vec<u8>) -> Vec<u8>
     where W: Unsigned
 {
@@ -42,6 +65,22 @@ pub fn encode_kernel<W, const T: usize>(key: Vec<u8>, pt: [W; 2]) -> [W; 2]
     [a,b]
 }
 
+///
+/// Decrypts a plaintext `pt` and returns a ciphertext `ct`.
+/// The `pt` should have length 2 * w = 2 * bytes(W)
+/// 
+/// W: is the data type. Currently supported: u8, u16, u32, u64, u128
+/// T: is the key expansion length T = 2 * (r + 1) being r number of rounds. T
+/// should be even.
+///
+/// Example:
+///
+/// let key = vec![0x00, 0x01, 0x02, 0x03];
+/// let pt  = vec![0x00, 0x01];
+/// let ct  = vec![0x21, 0x2A];
+/// let res = decode::<u8, 26>(key, ct);
+/// assert!(&ct[..] == &res[..]);
+/// 
 pub fn decode<W, const T: usize>(key: Vec<u8>, ct: Vec<u8>) -> Vec<u8>
     where W: Unsigned
 {
@@ -67,9 +106,18 @@ pub fn decode_kernel<W, const T: usize>(key: Vec<u8>, ct: [W; 2]) -> [W; 2]
     [a-key_exp[0], b-key_exp[1]]
 }
 
-/*
- * Expands the key to t = 2(r+1) bytes
- */
+///
+/// Expands `key` into and array of length `T` of type `W`
+/// 
+/// W: is the data type. Currently supported: u8, u16, u32, u64, u128
+/// T: is the key expansion length T = 2 * (r + 1) being r number of rounds. T
+/// should be even.
+///
+/// Example:
+///
+/// let key = vec![0x00, 0x01, 0x02, 0x03];
+/// let key_exp = expand_key::<W,T>(key);
+/// 
 pub fn expand_key<W, const T: usize>(key: Vec<u8>) -> [W;T]
     where W: Unsigned
 {
@@ -429,7 +477,7 @@ mod tests {
         b.iter(|| {
             let key = vec![0x00, 0x01, 0x02, 0x03];
             let pt  = vec![0x00, 0x01];
-            let res = encode::<u8, 26>(key, pt);
+            encode::<u8, 26>(key, pt);
         });
     }
 
@@ -438,7 +486,7 @@ mod tests {
         b.iter(|| {
             let key = vec![0x00, 0x01, 0x02, 0x03];
             let ct  = vec![0x21, 0x2A];
-            let res = decode::<u8, 26>(key, ct);
+            decode::<u8, 26>(key, ct);
         });
     }
 
@@ -446,7 +494,7 @@ mod tests {
     fn bench_encode_kernel_8_12_4(b: &mut Bencher) {
         b.iter(|| {
             let key = vec![0x00, 0x01, 0x02, 0x03];
-            let res = encode_kernel::<u8, 26>(key, [0x00, 0x01]);
+            encode_kernel::<u8, 26>(key, [0x00, 0x01]);
         });
     }
 
@@ -454,7 +502,7 @@ mod tests {
     fn bench_decode_kernel_8_12_4(b: &mut Bencher) {
         b.iter(|| {
             let key = vec![0x00, 0x01, 0x02, 0x03];
-            let res = decode_kernel::<u8, 26>(key, [0x21, 0x2A]);
+            decode_kernel::<u8, 26>(key, [0x21, 0x2A]);
         });
     }
 
@@ -463,7 +511,7 @@ mod tests {
         b.iter(|| {
             let key = vec![0x00, 0x01, 0x02, 0x03, 0x04, 0x05, 0x06, 0x07];
             let pt  = vec![0x00, 0x01, 0x02, 0x03];
-            let res = encode::<u16, 34>(key, pt);
+            encode::<u16, 34>(key, pt);
         });
     }
 
@@ -472,7 +520,7 @@ mod tests {
         b.iter(|| {
             let key = vec![0x00, 0x01, 0x02, 0x03, 0x04, 0x05, 0x06, 0x07];
             let ct  = vec![0x23, 0xA8, 0xD7, 0x2E];
-            let res = decode::<u16, 34>(key, ct);
+            decode::<u16, 34>(key, ct);
         });
     }
 
@@ -480,7 +528,7 @@ mod tests {
     fn bench_encode_kernel_16_16_8(b: &mut Bencher) {
         b.iter(|| {
             let key = vec![0x00, 0x01, 0x02, 0x03, 0x04, 0x05, 0x06, 0x07];
-            let res = encode_kernel::<u16, 34>(key, [0x0100, 0x0302]);
+            encode_kernel::<u16, 34>(key, [0x0100, 0x0302]);
         });
     }
 
@@ -488,7 +536,7 @@ mod tests {
     fn bench_decode_kernel_16_16_8(b: &mut Bencher) {
         b.iter(|| {
             let key = vec![0x00, 0x01, 0x02, 0x03, 0x04, 0x05, 0x06, 0x07];
-            let res = decode_kernel::<u16, 34>(key, [0xA823, 0x2ED7]);
+            decode_kernel::<u16, 34>(key, [0xA823, 0x2ED7]);
         });
     }
 
@@ -497,7 +545,7 @@ mod tests {
         b.iter(|| {
             let key = vec![0x00, 0x01, 0x02, 0x03, 0x04, 0x05, 0x06, 0x07, 0x08, 0x09, 0x0A, 0x0B, 0x0C, 0x0D, 0x0E, 0x0F];
             let pt  = vec![0x00, 0x01, 0x02, 0x03, 0x04, 0x05, 0x06, 0x07];
-            let res = encode::<u32, 42>(key, pt);
+            encode::<u32, 42>(key, pt);
         });
     }
 
@@ -506,7 +554,7 @@ mod tests {
         b.iter(|| {
             let key = vec![0x00, 0x01, 0x02, 0x03, 0x04, 0x05, 0x06, 0x07, 0x08, 0x09, 0x0A, 0x0B, 0x0C, 0x0D, 0x0E, 0x0F];
             let ct  = vec![0x2A, 0x0E, 0xDC, 0x0E, 0x94, 0x31, 0xFF, 0x73];
-            let res = decode::<u32, 42>(key, ct);
+            decode::<u32, 42>(key, ct);
         });
     }
 
@@ -514,7 +562,7 @@ mod tests {
     fn bench_encode_kernel_32_20_16(b: &mut Bencher) {
         b.iter(|| {
             let key = vec![0x00, 0x01, 0x02, 0x03, 0x04, 0x05, 0x06, 0x07, 0x08, 0x09, 0x0A, 0x0B, 0x0C, 0x0D, 0x0E, 0x0F];
-            let res = encode_kernel::<u32, 42>(key, [0x03020100, 0x07060504]);
+            encode_kernel::<u32, 42>(key, [0x03020100, 0x07060504]);
         });
     }
 
@@ -522,7 +570,7 @@ mod tests {
     fn bench_decode_kernel_32_20_16(b: &mut Bencher) {
         b.iter(|| {
             let key = vec![0x00, 0x01, 0x02, 0x03, 0x04, 0x05, 0x06, 0x07, 0x08, 0x09, 0x0A, 0x0B, 0x0C, 0x0D, 0x0E, 0x0F];
-            let res = decode_kernel::<u32, 42>(key, [0x0EDC0E2A, 0x73FF3194]);
+            decode_kernel::<u32, 42>(key, [0x0EDC0E2A, 0x73FF3194]);
         });
     }
 
@@ -532,7 +580,7 @@ mod tests {
             let key = vec![0x00, 0x01, 0x02, 0x03, 0x04, 0x05, 0x06, 0x07, 0x08, 0x09, 0x0A, 0x0B, 0x0C, 0x0D, 0x0E, 0x0F,
                            0x10, 0x11, 0x12, 0x13, 0x14, 0x15, 0x16, 0x17];
             let pt  = vec![0x00, 0x01, 0x02, 0x03, 0x04, 0x05, 0x06, 0x07, 0x08, 0x09, 0x0A, 0x0B, 0x0C, 0x0D, 0x0E, 0x0F];
-            let res = encode::<u64, 50>(key, pt);
+            encode::<u64, 50>(key, pt);
         });
     }
 
@@ -542,7 +590,7 @@ mod tests {
             let key = vec![0x00, 0x01, 0x02, 0x03, 0x04, 0x05, 0x06, 0x07, 0x08, 0x09, 0x0A, 0x0B, 0x0C, 0x0D, 0x0E, 0x0F,
                            0x10, 0x11, 0x12, 0x13, 0x14, 0x15, 0x16, 0x17];
             let ct  = vec![0xA4, 0x67, 0x72, 0x82, 0x0E, 0xDB, 0xCE, 0x02, 0x35, 0xAB, 0xEA, 0x32, 0xAE, 0x71, 0x78, 0xDA];
-            let res = decode::<u64, 50>(key, ct);
+            decode::<u64, 50>(key, ct);
         });
     }
 
@@ -551,7 +599,7 @@ mod tests {
         b.iter(|| {
             let key = vec![0x00, 0x01, 0x02, 0x03, 0x04, 0x05, 0x06, 0x07, 0x08, 0x09, 0x0A, 0x0B, 0x0C, 0x0D, 0x0E, 0x0F,
                            0x10, 0x11, 0x12, 0x13, 0x14, 0x15, 0x16, 0x17];
-            let res = encode_kernel::<u64, 50>(key, [0x0706050403020100, 0x0F0E0D0C0B0A0908]);
+            encode_kernel::<u64, 50>(key, [0x0706050403020100, 0x0F0E0D0C0B0A0908]);
         });
     }
 
@@ -560,7 +608,7 @@ mod tests {
         b.iter(|| {
             let key = vec![0x00, 0x01, 0x02, 0x03, 0x04, 0x05, 0x06, 0x07, 0x08, 0x09, 0x0A, 0x0B, 0x0C, 0x0D, 0x0E, 0x0F,
                            0x10, 0x11, 0x12, 0x13, 0x14, 0x15, 0x16, 0x17];
-            let res = decode_kernel::<u64, 50>(key, [0x02CEDB0E827267A4, 0xDA7871AE32EAAB35]);
+            decode_kernel::<u64, 50>(key, [0x02CEDB0E827267A4, 0xDA7871AE32EAAB35]);
         });
     }
 
@@ -571,7 +619,7 @@ mod tests {
                            0x10, 0x11, 0x12, 0x13, 0x14, 0x15, 0x16, 0x17, 0x18, 0x19, 0x1A, 0x1B, 0x1C, 0x1D, 0x1E, 0x1F];
             let pt  = vec![0x00, 0x01, 0x02, 0x03, 0x04, 0x05, 0x06, 0x07, 0x08, 0x09, 0x0A, 0x0B, 0x0C, 0x0D, 0x0E, 0x0F,
                            0x10, 0x11, 0x12, 0x13, 0x14, 0x15, 0x16, 0x17, 0x18, 0x19, 0x1A, 0x1B, 0x1C, 0x1D, 0x1E, 0x1F];
-            let res = encode::<u128, 58>(key, pt);
+            encode::<u128, 58>(key, pt);
         });
     }
 
@@ -582,7 +630,7 @@ mod tests {
                            0x10, 0x11, 0x12, 0x13, 0x14, 0x15, 0x16, 0x17, 0x18, 0x19, 0x1A, 0x1B, 0x1C, 0x1D, 0x1E, 0x1F];
             let ct  = vec![0xEC, 0xA5, 0x91, 0x09, 0x21, 0xA4, 0xF4, 0xCF, 0xDD, 0x7A, 0xD7, 0xAD, 0x20, 0xA1, 0xFC, 0xBA,
                            0x06, 0x8E, 0xC7, 0xA7, 0xCD, 0x75, 0x2D, 0x68, 0xFE, 0x91, 0x4B, 0x7F, 0xE1, 0x80, 0xB4, 0x40];
-            let res = decode::<u128, 58>(key, ct);
+            decode::<u128, 58>(key, ct);
         });
     }
 
@@ -591,7 +639,7 @@ mod tests {
         b.iter(|| {
             let key = vec![0x00, 0x01, 0x02, 0x03, 0x04, 0x05, 0x06, 0x07, 0x08, 0x09, 0x0A, 0x0B, 0x0C, 0x0D, 0x0E, 0x0F,
                            0x10, 0x11, 0x12, 0x13, 0x14, 0x15, 0x16, 0x17, 0x18, 0x19, 0x1A, 0x1B, 0x1C, 0x1D, 0x1E, 0x1F];
-            let res = encode_kernel::<u128, 58>(key, [0x0F0E0D0C0B0A09080706050403020100, 0x1F1E1D1C1B1A19181716151413121110]);
+            encode_kernel::<u128, 58>(key, [0x0F0E0D0C0B0A09080706050403020100, 0x1F1E1D1C1B1A19181716151413121110]);
         });
     }
 
@@ -600,7 +648,7 @@ mod tests {
         b.iter(|| {
             let key = vec![0x00, 0x01, 0x02, 0x03, 0x04, 0x05, 0x06, 0x07, 0x08, 0x09, 0x0A, 0x0B, 0x0C, 0x0D, 0x0E, 0x0F,
                            0x10, 0x11, 0x12, 0x13, 0x14, 0x15, 0x16, 0x17, 0x18, 0x19, 0x1A, 0x1B, 0x1C, 0x1D, 0x1E, 0x1F];
-            let res = decode_kernel::<u128, 58>(key, [0xBAFCA120ADD77ADDCFF4A4210991A5EC, 0x40B480E17F4B91FE682D75CDA7C78E06]);
+            decode_kernel::<u128, 58>(key, [0xBAFCA120ADD77ADDCFF4A4210991A5EC, 0x40B480E17F4B91FE682D75CDA7C78E06]);
         });
     }
 }

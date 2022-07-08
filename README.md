@@ -1,8 +1,8 @@
 # RC5 block-cipher in Rust
 
 Library implementation of the basic RC5 block cipher in Rust. RC5 is different
-from the classical ciphers (like AES) in the sense that allow to parametrize
-the algorithm to optimize security and efficiency for different hardware.
+from the classical ciphers (like AES) in the sense that allows to parametrize
+the algorithm and optimize both security and efficiency on different hardware.
 
 These parameters are:
 
@@ -13,22 +13,26 @@ These parameters are:
 The selection of each of them should be preferably done by choosing standards
 from other use cases. For example the word length `w` could be any number of
 bytes but the recommendation for performance and security is that should be a
-power of 2, or even better, a power of 8. This RC5 implementation implements
-only the standard values of `w` (powers of 8) making use of the standard Rust
-types: u8, u16, u32, u64, u128.
+power of 2, or even better, a power of 8. In that way one can use the hardware
+registers more efficiently, e.g. 32-bits or 64-bits registers, with
+vectorization possibilies (AVX on Intel or SVE on ARM).
+
+This RC5 implementation is designed only for the standard values of `w` (powers
+of 8) making use of the standard Rust types: u8, u16, u32, u64, u128.
 
 ## Error Handling
 
 Since a cipher should be efficient and secure the way we handle errors is
-through panicking. This means that when something unexpected happens during the
-program execution, e.g. a bad length in an array we stop the program calling
-the `panic!` macro. The users of this library need to have this into account
-when they pass arguments to this library.
+through unrecoverable errors through panicking when something undersired occurs.
+This means that when something unexpected happens during the program execution,
+e.g. a bad length in an array we stop the program calling the `panic!` macro.
+The users of this library need to have this into account when they pass
+arguments to this library.
 
 # Testing
 
-The application can only run in release mode in order to allow arithmetic overflow
-in the operations:
+The application can only run in release mode and be compiled with nightly Rust
+in order to allow arithmetic overflow in the operations:
 
 ```
 cargo +nightly test --release
@@ -70,7 +74,9 @@ test tests::bench_decode_kernel_128_28_32 ... bench:         928 ns/iter (+/- 65
 ```
 
 ## TODO
-[] Use case with a main
+ - [ ] Use case with a main to encrypt/decrypt a file (here an encryption mode
+ should be selected)
+ - [ ] Publish a crate
 
 ## Bibliography
 
