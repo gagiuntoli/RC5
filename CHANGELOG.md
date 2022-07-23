@@ -1,3 +1,7 @@
+23.07.2022
+* Replace macro for inlined functions, up to 10% increase in performance for the
+  default benchmarks.
+
 05.07.2022
 
 * Pulling apart code encode/decode into main kernel.

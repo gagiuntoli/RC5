@@ -1,5 +1,5 @@
 //!
-//! # RC5 block-cipher
+//! # rc5 block-cipher
 //!
 //! `rc5` is a crate to encrypt and decrypt messages using the RC5 algorithm:
 //!  https://www.grc.com/r&d/rc5.pdf
@@ -12,16 +12,14 @@ mod unsigned;
 use unsigned::Unsigned;
 use std::convert::TryInto;
 
-macro_rules! rotl {
-    ($a: expr, $b: expr) => {
-        ($a<<($b&(W::BITS-W::ONE))) | ($a>>((W::BITS)-($b&(W::BITS-W::ONE))))
-    }
+#[inline(always)]
+fn rotl<W: Unsigned>(a: W, b: W) -> W {
+    (a<<(b&(W::BITS-W::ONE))) | (a>>((W::BITS)-(b&(W::BITS-W::ONE))))
 }
 
-macro_rules! rotr {
-    ($a: expr, $b: expr) => {
-        ($a>>($b&(W::BITS-W::ONE))) | ($a<<((W::BITS)-($b&(W::BITS-W::ONE))))
-    }
+#[inline(always)]
+fn rotr<W: Unsigned>(a: W, b: W) -> W {
+    (a>>(b&(W::BITS-W::ONE))) | (a<<((W::BITS)-(b&(W::BITS-W::ONE))))
 }
 
 ///
@@ -59,8 +57,8 @@ pub fn encode_kernel<W, const T: usize>(key: Vec<u8>, pt: [W; 2]) -> [W; 2]
     let mut a = pt[0] + key_exp[0];
     let mut b = pt[1] + key_exp[1];
     for i in 1..=r {
-        a = rotl!(a^b, b) + key_exp[2*i];
-        b = rotl!(b^a, a) + key_exp[2*i+1];
+        a = rotl(a^b, b) + key_exp[2*i];
+        b = rotl(b^a, a) + key_exp[2*i+1];
     }
     [a,b]
 }
@@ -100,8 +98,8 @@ pub fn decode_kernel<W, const T: usize>(key: Vec<u8>, ct: [W; 2]) -> [W; 2]
     let mut a = ct[0];
     let mut b = ct[1];
     for i in (1..=r).rev() {
-        b = rotr!(b-key_exp[2*i+1], a) ^ a;
-        a = rotr!(a-key_exp[2*i]  , b) ^ b;
+        b = rotr(b-key_exp[2*i+1], a) ^ a;
+        a = rotr(a-key_exp[2*i]  , b) ^ b;
     }
     [a-key_exp[0], b-key_exp[1]]
 }
@@ -149,14 +147,13 @@ pub fn expand_key<W, const T: usize>(key: Vec<u8>) -> [W;T]
     let mut a = W::ZERO;
     let mut b = W::ZERO;
     for _k in 0..3*std::cmp::max(c, T) {
-        key_s[i] = rotl!((key_s[i] + (a + b)), W::THREE);
+        key_s[i] = rotl(key_s[i] + a + b, W::THREE);
         a = key_s[i];
-        key_l[j] = rotl!((key_l[j] + (a + b)), (a + b));
+        key_l[j] = rotl(key_l[j] + a + b, a + b);
         b = key_l[j];
         i = (i+1)%T;
         j = (j+1)%c;
     }
-
     key_s
 }
 
