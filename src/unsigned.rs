@@ -1,13 +1,13 @@
-use std::convert::TryInto;
-
-pub trait Unsigned: num::Unsigned +
-                num::traits::WrappingAdd +
-                std::ops::BitAnd<Output = Self> +
-                std::ops::BitOr<Output = Self> +
-                std::ops::BitXor<Output = Self> +
-                std::ops::Shl<Output = Self> +
-                std::ops::Shr<Output = Self> +
-                From<u8> + Copy
+pub trait Unsigned:
+    num::Unsigned
+    + num::traits::WrappingAdd
+    + std::ops::BitAnd<Output = Self>
+    + std::ops::BitOr<Output = Self>
+    + std::ops::BitXor<Output = Self>
+    + std::ops::Shl<Output = Self>
+    + std::ops::Shr<Output = Self>
+    + From<u8>
+    + Copy
 {
     type Array;
 
