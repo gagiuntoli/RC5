@@ -19,12 +19,12 @@ pub enum Error {
 
 #[inline(always)]
 fn rotl<W: Unsigned>(a: W, b: W) -> W {
-    (a << (b & (W::BITS - W::ONE))) | (a >> ((W::BITS) - (b & (W::BITS - W::ONE))))
+    (a << (b & (W::BITS - 1.into()))) | (a >> ((W::BITS) - (b & (W::BITS - 1.into()))))
 }
 
 #[inline(always)]
 fn rotr<W: Unsigned>(a: W, b: W) -> W {
-    (a >> (b & (W::BITS - W::ONE))) | (a << ((W::BITS) - (b & (W::BITS - W::ONE))))
+    (a >> (b & (W::BITS - 1.into()))) | (a << ((W::BITS) - (b & (W::BITS - 1.into()))))
 }
 
 ///
@@ -151,7 +151,7 @@ pub fn expand_key<W, const T: usize>(key: Vec<u8>) -> [W; T]
 where
     W: Unsigned,
 {
-    let mut key_s = [W::ZERO; T];
+    let mut key_s = [0.into(); T];
     let b = key.len();
 
     // c = max(1, ceil(8*b/w))
@@ -161,11 +161,11 @@ where
     )) as usize;
 
     // converting the secrey key from bytes to words
-    let mut key_l = vec![W::ZERO; c];
+    let mut key_l = vec![0.into(); c];
     let u = W::BYTES as usize;
     for i in (0..=(b - 1)).rev() {
         let ix = (i / u) as usize;
-        key_l[ix] = (key_l[ix] << W::EIGHT) + W::from(key[i]);
+        key_l[ix] = (key_l[ix] << 8.into()) + W::from(key[i]);
     }
 
     // initializing array S
@@ -177,10 +177,10 @@ where
     // Mixing in the secret key
     let mut i = 0;
     let mut j = 0;
-    let mut a = W::ZERO;
-    let mut b = W::ZERO;
+    let mut a = 0.into();
+    let mut b = 0.into();
     for _k in 0..3 * std::cmp::max(c, T) {
-        key_s[i] = rotl(key_s[i] + a + b, W::THREE);
+        key_s[i] = rotl(key_s[i] + a + b, 3.into());
         a = key_s[i];
         key_l[j] = rotl(key_l[j] + a + b, a + b);
         b = key_l[j];
