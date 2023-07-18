@@ -1,6 +1,9 @@
 pub trait Unsigned:
     num::Unsigned
     + num::traits::WrappingAdd
+    + num::traits::WrappingSub
+    + num::traits::WrappingShl
+    + num::traits::WrappingShr
     + std::ops::BitAnd<Output = Self>
     + std::ops::BitOr<Output = Self>
     + std::ops::BitXor<Output = Self>

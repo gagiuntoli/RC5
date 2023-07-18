@@ -1,11 +1,59 @@
-//!
-//! # rc5 block-cipher
-//!
-//! `rc5` is a crate to encrypt and decrypt messages using the RC5 algorithm:
-//!  https://www.grc.com/r&d/rc5.pdf
-//!
-use std::convert::TryInto;
+/*!
+ # RC5 block-cipher
+
+ Library implementation of the basic RC5 block cipher in Rust. RC5 is different
+ from the classical ciphers (like AES) in the sense that allows to parametrize
+ the algorithm and optimize both security and efficiency on different hardware.
+
+ These parameters are:
+
+ * `w`: word length in bytes
+ * `r`: number of rounds
+ * `b`: key length in bytes
+
+ The selection of each of them should be preferably done by choosing standards
+ from other use cases. For example the word length `w` could be any number of
+ bytes but the recommendation for performance and security is that should be a
+ power of 2, or even better, a power of 8. In that way one can use the hardware
+ registers more efficiently, e.g. 32-bits or 64-bits registers, with
+ vectorization possibilities (AVX on Intel or SVE on ARM).
+
+ This RC5 implementation is designed only for the standard values of `w` (powers
+ of 8) making use of the standard Rust types: u8, u16, u32, u64, u128.
+
+ ## Example: encryption
+
+ ```rust
+ use rc5_cipher::encode;
+
+ let key = vec![
+     0x00, 0x01, 0x02, 0x03, 0x04, 0x05, 0x06, 0x07, 0x08, 0x09, 0x0A, 0x0B, 0x0C, 0x0D,
+     0x0E, 0x0F,
+ ];
+ let pt = vec![0x00, 0x11, 0x22, 0x33, 0x44, 0x55, 0x66, 0x77];
+ let ct = vec![0x2D, 0xDC, 0x14, 0x9B, 0xCF, 0x08, 0x8B, 0x9E];
+
+// let res = encode::<u32, 26>(key, pt);
+// assert_eq!(ct, res.unwrap());
+ ```
+
+ ## Example: decryption
+
+ ```rust
+ use rc5_cipher::decode;
+
+ let key = vec![0x00, 0x01, 0x02, 0x03];
+ let pt  = vec![0x00, 0x01];
+ let ct  = vec![0x21, 0x2A];
+ // let res = decode::<u8, 26>(key, ct.clone()).unwrap();
+
+ // assert!(&ct[..] == &res[..]);
+ ```
+
+*/
+
 use crate::unsigned::Unsigned;
+use std::convert::TryInto;
 
 #[derive(PartialEq, Debug)]
 pub enum Error {
@@ -14,13 +62,15 @@ pub enum Error {
 }
 
 #[inline(always)]
+#[allow(arithmetic_overflow)]
 fn rotl<W: Unsigned>(a: W, b: W) -> W {
-    (a << (b & (W::BITS - 1.into()))) | (a >> ((W::BITS) - (b & (W::BITS - 1.into()))))
+    (a << (b & (W::BITS - 1.into()))) | (a >> ((W::BITS).wrapping_sub(&(b & (W::BITS - 1.into())))))
 }
 
 #[inline(always)]
+#[allow(arithmetic_overflow)]
 fn rotr<W: Unsigned>(a: W, b: W) -> W {
-    (a >> (b & (W::BITS - 1.into()))) | (a << ((W::BITS) - (b & (W::BITS - 1.into()))))
+    (a >> (b & (W::BITS - 1.into()))) | (a << ((W::BITS).wrapping_sub(&(b & (W::BITS - 1.into())))))
 }
 
 ///
@@ -33,12 +83,19 @@ fn rotr<W: Unsigned>(a: W, b: W) -> W {
 ///
 /// Example:
 ///
+/// ```rust
+/// use rc5_cipher::encode;
+///
 /// let key = vec![0x00, 0x01, 0x02, 0x03];
 /// let pt  = vec![0x00, 0x01];
 /// let ct  = vec![0x21, 0x2A];
-/// let res = encode::<u8, 26>(key, pt);
-/// assert!(&ct[..] == &res[..]);
+/// //let res = encode::<u8, 26>(key, pt).unwrap();
 ///
+/// //assert!(&ct[..] == &res[..]);
+/// ```
+///
+///
+#[allow(arithmetic_overflow)]
 pub fn encode<W, const T: usize>(key: Vec<u8>, pt: Vec<u8>) -> Result<Vec<u8>, Error>
 where
     W: Unsigned,
@@ -62,37 +119,44 @@ where
     Ok([W::to_le_bytes(a).as_slice(), W::to_le_bytes(b).as_slice()].concat())
 }
 
+#[allow(arithmetic_overflow)]
 pub fn encode_kernel<W, const T: usize>(key: Vec<u8>, pt: [W; 2]) -> [W; 2]
 where
     W: Unsigned,
 {
     let key_exp = expand_key::<W, T>(key);
     let r = T / 2 - 1;
-    let mut a = pt[0] + key_exp[0];
-    let mut b = pt[1] + key_exp[1];
+    let mut a = pt[0].wrapping_add(&key_exp[0]);
+    let mut b = pt[1].wrapping_add(&key_exp[1]);
     for i in 1..=r {
-        a = rotl(a ^ b, b) + key_exp[2 * i];
-        b = rotl(b ^ a, a) + key_exp[2 * i + 1];
+        a = rotl(a ^ b, b).wrapping_add(&key_exp[2 * i]);
+        b = rotl(b ^ a, a).wrapping_add(&key_exp[2 * i + 1]);
     }
     [a, b]
 }
 
 ///
-/// Decrypts a plaintext `pt` and returns a ciphertext `ct`.
-/// The `pt` should have length 2 * w = 2 * bytes(W)
+/// Decrypts a ciphertext `ct` and returns a plaintext `pt`.
+/// The `ct` should have length 2 * w = 2 * bytes(W)
 ///
-/// W: is the data type. Currently supported: u8, u16, u32, u64, u128
-/// T: is the key expansion length T = 2 * (r + 1) being r number of rounds. T
-/// should be even.
+/// `W`: is the data type. Currently supported: u8, u16, u32, u64, u128
+/// `T`: is the key expansion length `T = 2 * (r + 1)` being r number of rounds.
+/// `T` should be even.
 ///
 /// Example:
 ///
-/// let key = vec![0x00, 0x01, 0x02, 0x03];
-/// let pt  = vec![0x00, 0x01];
-/// let ct  = vec![0x21, 0x2A];
-/// let res = decode::<u8, 26>(key, ct);
-/// assert!(&ct[..] == &res[..]);
+/// ```rust
+/// // use rc5_cipher::decode;
 ///
+/// // let key = vec![0x00, 0x01, 0x02, 0x03];
+/// // let pt  = vec![0x00, 0x01];
+/// // let ct  = vec![0x21, 0x2A];
+/// // let res = decode::<u8, 26>(key, ct.clone()).unwrap();
+///
+/// // assert!(&ct[..] == &res[..]);
+/// ```
+///
+#[allow(arithmetic_overflow)]
 pub fn decode<W, const T: usize>(key: Vec<u8>, ct: Vec<u8>) -> Result<Vec<u8>, Error>
 where
     W: Unsigned,
@@ -116,6 +180,7 @@ where
     Ok([W::to_le_bytes(a).as_slice(), W::to_le_bytes(b).as_slice()].concat())
 }
 
+#[allow(arithmetic_overflow)]
 pub fn decode_kernel<W, const T: usize>(key: Vec<u8>, ct: [W; 2]) -> [W; 2]
 where
     W: Unsigned,
@@ -125,10 +190,10 @@ where
     let mut a = ct[0];
     let mut b = ct[1];
     for i in (1..=r).rev() {
-        b = rotr(b - key_exp[2 * i + 1], a) ^ a;
-        a = rotr(a - key_exp[2 * i], b) ^ b;
+        b = rotr(b.wrapping_sub(&key_exp[2 * i + 1]), a) ^ a;
+        a = rotr(a.wrapping_sub(&key_exp[2 * i]), b) ^ b;
     }
-    [a - key_exp[0], b - key_exp[1]]
+    [a.wrapping_sub(&key_exp[0]), b.wrapping_sub(&key_exp[1])]
 }
 
 ///
@@ -143,6 +208,7 @@ where
 /// let key = vec![0x00, 0x01, 0x02, 0x03];
 /// let key_exp = expand_key::<W,T>(key);
 ///
+#[allow(arithmetic_overflow)]
 pub fn expand_key<W, const T: usize>(key: Vec<u8>) -> [W; T]
 where
     W: Unsigned,
@@ -157,28 +223,31 @@ where
     )) as usize;
 
     // converting the secrey key from bytes to words
-    let mut key_l = vec![0.into(); c];
+    let mut key_l: Vec<W> = vec![0.into(); c];
     let u = W::BYTES as usize;
     for i in (0..=(b - 1)).rev() {
         let ix = (i / u) as usize;
-        key_l[ix] = (key_l[ix] << 8.into()) + W::from(key[i]);
+        key_l[ix] = (key_l[ix].wrapping_shl(8u32)).wrapping_add(&W::from(key[i]));
     }
 
     // initializing array S
     key_s[0] = W::P;
     for i in 1..=(T - 1) {
-        key_s[i] = key_s[i - 1] + W::Q;
+        key_s[i] = key_s[i - 1].wrapping_add(&W::Q);
     }
 
     // Mixing in the secret key
     let mut i = 0;
     let mut j = 0;
-    let mut a = 0.into();
+    let mut a: W = 0.into();
     let mut b = 0.into();
     for _k in 0..3 * std::cmp::max(c, T) {
-        key_s[i] = rotl(key_s[i] + a + b, 3.into());
+        key_s[i] = rotl(key_s[i].wrapping_add(&a.wrapping_add(&b)), 3.into());
         a = key_s[i];
-        key_l[j] = rotl(key_l[j] + a + b, a + b);
+        key_l[j] = rotl(
+            key_l[j].wrapping_add(&a.wrapping_add(&b)),
+            a.wrapping_add(&b),
+        );
         b = key_l[j];
         i = (i + 1) % T;
         j = (j + 1) % c;
