@@ -31,11 +31,11 @@ arguments to this library.
 
 # Testing
 
-The application can only run in release mode and be compiled with nightly Rust
-in order to allow arithmetic overflow in the operations:
+The application runs in release mode only since arithmetic overflow should be
+allowed: 
 
 ```
-cargo +nightly test --release
+cargo test --release
 ```
 
 # Benchmarking
