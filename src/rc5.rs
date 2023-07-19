@@ -53,6 +53,12 @@
  assert_eq!(pt, res.unwrap());
  ```
 
+ ## Bibliography
+
+ - Rivest original paper: https://www.grc.com/r&d/rc5.pdf
+ - C implementation and tests: https://tools.ietf.org/id/draft-krovetz-rc6-rc5-vectors-00.html#rfc.section.4
+ - Haskell implementation: https://hackage.haskell.org/package/cipher-rc5-0.1.1.2/docs/src/Crypto-Cipher-RC5.html
+
 */
 
 use crate::unsigned::Unsigned;
@@ -82,7 +88,7 @@ fn rotr<W: Unsigned>(a: W, b: W) -> W {
 
 ///
 /// Encrypts a plaintext `pt` and returns a ciphertext `ct`.
-/// The `pt` should have length 2 * w = 2 * bytes(W)
+/// The `pt` should have length `2 * w = 2 * bytes(W)`
 ///
 /// `W`: is the data type. Currently supported: u8, u16, u32, u64, u128
 /// `T`: is the key expansion length `T = 2 * (r + 1)` being `r` number of
@@ -100,7 +106,6 @@ fn rotr<W: Unsigned>(a: W, b: W) -> W {
 ///     
 /// assert!(&ct[..] == &res[..]);
 /// ```
-///
 ///
 #[allow(arithmetic_overflow)]
 pub fn encode<W, const T: usize>(key: Vec<u8>, pt: Vec<u8>) -> Result<Vec<u8>, Error>
@@ -159,7 +164,7 @@ where
 /// let pt  = vec![0x00, 0x01];
 /// let ct  = vec![0x21, 0x2A];
 /// let res = decode::<u8, 26>(key, ct.clone()).unwrap();
-/// 
+///
 /// assert!(&pt[..] == &res[..]);
 /// ```
 ///
@@ -214,9 +219,14 @@ where
 ///
 /// ```rust
 /// use rc5_cipher::expand_key;
-/// 
+///
 /// let key = vec![0x00, 0x01, 0x02, 0x03];
-/// let key_exp = expand_key::<u32, 2>(key);
+/// let key_exp = expand_key::<u32, 4>(key);
+///
+/// assert_eq!(
+///     &key_exp[..],
+///     [0xbc13a1cf, 0xfeda18e9, 0x39252ff2, 0x57a51ad8]
+/// );
 /// ```
 ///
 #[allow(arithmetic_overflow)]
@@ -270,7 +280,16 @@ where
 mod tests {
     use super::*;
 
-    /* test cases from Mintlayer and Rivest paper */
+    // #[test]
+    // fn expand_key_a() {
+    //     let key = vec![0x00, 0x01, 0x02, 0x03];
+    //     let key_exp = expand_key::<u32, 4>(key);
+
+    //     assert_eq!(
+    //         &key_exp[..],
+    //         [0xbc13a1cf, 0xfeda18e9, 0x39252ff2, 0x57a51ad8]
+    //     );
+    // }
 
     #[test]
     fn encode_fails_short_message() {
