@@ -33,8 +33,8 @@
  let pt = vec![0x00, 0x11, 0x22, 0x33, 0x44, 0x55, 0x66, 0x77];
  let ct = vec![0x2D, 0xDC, 0x14, 0x9B, 0xCF, 0x08, 0x8B, 0x9E];
 
-// let res = encode::<u32, 26>(key, pt);
-// assert_eq!(ct, res.unwrap());
+ let res = encode::<u32, 26>(key, pt);
+ assert_eq!(ct, res.unwrap());
  ```
 
  ## Example: decryption
@@ -42,12 +42,15 @@
  ```rust
  use rc5_cipher::decode;
 
- let key = vec![0x00, 0x01, 0x02, 0x03];
- let pt  = vec![0x00, 0x01];
- let ct  = vec![0x21, 0x2A];
- // let res = decode::<u8, 26>(key, ct.clone()).unwrap();
+ let key = vec![
+     0x00, 0x01, 0x02, 0x03, 0x04, 0x05, 0x06, 0x07, 0x08, 0x09, 0x0A, 0x0B, 0x0C, 0x0D,
+     0x0E, 0x0F,
+ ];
+ let pt = vec![0x00, 0x11, 0x22, 0x33, 0x44, 0x55, 0x66, 0x77];
+ let ct = vec![0x2D, 0xDC, 0x14, 0x9B, 0xCF, 0x08, 0x8B, 0x9E];
 
- // assert!(&ct[..] == &res[..]);
+ let res = decode::<u32, 26>(key, ct);
+ assert_eq!(pt, res.unwrap());
  ```
 
 */
@@ -64,22 +67,26 @@ pub enum Error {
 #[inline(always)]
 #[allow(arithmetic_overflow)]
 fn rotl<W: Unsigned>(a: W, b: W) -> W {
-    (a << (b & (W::BITS - 1.into()))) | (a >> ((W::BITS).wrapping_sub(&(b & (W::BITS - 1.into())))))
+    let shl = (b & (W::BITS - 1.into())).rem(W::BITS);
+    let shr = ((W::BITS).wrapping_sub(&(b & (W::BITS - 1.into())))).rem(W::BITS);
+    (a << shl) | (a >> shr)
 }
 
 #[inline(always)]
 #[allow(arithmetic_overflow)]
 fn rotr<W: Unsigned>(a: W, b: W) -> W {
-    (a >> (b & (W::BITS - 1.into()))) | (a << ((W::BITS).wrapping_sub(&(b & (W::BITS - 1.into())))))
+    let shr = (b & (W::BITS - 1.into())).rem(W::BITS);
+    let shl = ((W::BITS).wrapping_sub(&(b & (W::BITS - 1.into())))).rem(W::BITS);
+    (a >> shr) | (a << shl)
 }
 
 ///
 /// Encrypts a plaintext `pt` and returns a ciphertext `ct`.
 /// The `pt` should have length 2 * w = 2 * bytes(W)
 ///
-/// W: is the data type. Currently supported: u8, u16, u32, u64, u128
-/// T: is the key expansion length T = 2 * (r + 1) being r number of rounds. T
-/// should be even.
+/// `W`: is the data type. Currently supported: u8, u16, u32, u64, u128
+/// `T`: is the key expansion length `T = 2 * (r + 1)` being `r` number of
+/// rounds. `T` should be even.
 ///
 /// Example:
 ///
@@ -89,9 +96,9 @@ fn rotr<W: Unsigned>(a: W, b: W) -> W {
 /// let key = vec![0x00, 0x01, 0x02, 0x03];
 /// let pt  = vec![0x00, 0x01];
 /// let ct  = vec![0x21, 0x2A];
-/// //let res = encode::<u8, 26>(key, pt).unwrap();
-///
-/// //assert!(&ct[..] == &res[..]);
+/// let res = encode::<u8, 26>(key, pt).unwrap();
+///     
+/// assert!(&ct[..] == &res[..]);
 /// ```
 ///
 ///
@@ -146,14 +153,14 @@ where
 /// Example:
 ///
 /// ```rust
-/// // use rc5_cipher::decode;
+/// use rc5_cipher::decode;
 ///
-/// // let key = vec![0x00, 0x01, 0x02, 0x03];
-/// // let pt  = vec![0x00, 0x01];
-/// // let ct  = vec![0x21, 0x2A];
-/// // let res = decode::<u8, 26>(key, ct.clone()).unwrap();
-///
-/// // assert!(&ct[..] == &res[..]);
+/// let key = vec![0x00, 0x01, 0x02, 0x03];
+/// let pt  = vec![0x00, 0x01];
+/// let ct  = vec![0x21, 0x2A];
+/// let res = decode::<u8, 26>(key, ct.clone()).unwrap();
+/// 
+/// assert!(&pt[..] == &res[..]);
 /// ```
 ///
 #[allow(arithmetic_overflow)]
@@ -199,14 +206,18 @@ where
 ///
 /// Expands `key` into and array of length `T` of type `W`
 ///
-/// W: is the data type. Currently supported: u8, u16, u32, u64, u128
-/// T: is the key expansion length T = 2 * (r + 1) being r number of rounds. T
-/// should be even.
+/// `W`: is the data type. Currently supported: u8, u16, u32, u64, u128
+/// `T`: is the key expansion length `T = 2 * (r + 1)` being `r` number of
+/// rounds. `T` should be even.
 ///
 /// Example:
 ///
+/// ```rust
+/// use rc5_cipher::expand_key;
+/// 
 /// let key = vec![0x00, 0x01, 0x02, 0x03];
-/// let key_exp = expand_key::<W,T>(key);
+/// let key_exp = expand_key::<u32, 2>(key);
+/// ```
 ///
 #[allow(arithmetic_overflow)]
 pub fn expand_key<W, const T: usize>(key: Vec<u8>) -> [W; T]

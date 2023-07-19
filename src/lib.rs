@@ -1,4 +1,4 @@
 pub mod rc5;
 pub mod unsigned;
 
-pub use rc5::{decode, encode};
+pub use rc5::{decode, encode, expand_key};
