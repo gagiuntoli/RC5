@@ -67,12 +67,6 @@
 
 use crate::word::Word;
 
-#[derive(PartialEq, Debug)]
-pub enum Error {
-    BadLength,
-    ConversionError,
-}
-
 pub fn rotl<W: Word>(x: W, y: W) -> W {
     let w = W::BYTES * 8;
     let a = y & W::from_usize(w - 1);
