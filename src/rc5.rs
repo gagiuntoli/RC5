@@ -32,11 +32,10 @@
      0x0E, 0x0F,
  ];
  let pt = [0x33221100u32, 0x77665544];
- let ct = [0x9B14DC2Du32, 0x9E8B08CF];
 
- let res = encrypt(pt, &key, rounds);
+ let ct = encrypt(pt, &key, rounds);
 
- assert_eq!(ct, res);
+ assert_eq!(ct, [0x9B14DC2Du32, 0x9E8B08CF]);
  ```
 
  ## Example: decryption
@@ -49,19 +48,18 @@
      0x00, 0x01, 0x02, 0x03, 0x04, 0x05, 0x06, 0x07, 0x08, 0x09, 0x0A, 0x0B, 0x0C, 0x0D,
      0x0E, 0x0F,
  ];
- let pt = [0x33221100u32, 0x77665544];
  let ct = [0x9B14DC2Du32, 0x9E8B08CF];
 
- let res = decrypt(ct, &key, rounds);
+ let pt = decrypt(ct, &key, rounds);
 
- assert_eq!(pt, res);
+ assert_eq!(pt, [0x33221100u32, 0x77665544]);
  ```
 
  ## Bibliography
 
  - Rivest original paper: https://www.grc.com/r&d/rc5.pdf
  - C implementation and tests: https://tools.ietf.org/id/draft-krovetz-rc6-rc5-vectors-00.html#rfc.section.4
- - Haskell implementation: https://hackage.haskell.org/package/cipher-rc5-0.1.1.2/docs/src/Crypto-Cipher-RC5.html
+ - Haskell implementation: https://hackage.haskell.org/package/cipher-rc5-0.1.2.2/docs/src/Crypto-Cipher-RC5.html
 
 */
 
@@ -89,25 +87,20 @@ pub fn rotr<W: Word>(x: W, y: W) -> W {
 
 ///
 /// Encrypts a plaintext `pt` and returns a ciphertext `ct`.
-/// The `pt` should have length `2 * w = 2 * bytes(W)`
-///
-/// `W`: is the data type. Currently supported: u8, u16, u32, u64, u128
-/// `T`: is the key expansion length `T = 2 * (r + 1)` being `r` number of
-/// rounds. `T` should be even.
+/// The `pt` is an array of two words `W` (u8, u16, u32, u64, u128)
 ///
 /// Example:
 ///
 /// ```rust
 /// use rc5_cipher::encrypt;
 ///
+/// let rounds = 12;
 /// let key = vec![0x00, 0x01, 0x02, 0x03];
 /// let pt  = [0x00u8, 0x01];
-/// let ct  = [0x21u8, 0x2A];
-/// let rounds = 12;
 ///
-/// let res = encrypt(pt, &key, rounds);
+/// let ct = encrypt(pt, &key, rounds);
 ///     
-/// assert!(&ct[..] == &res[..]);
+/// assert_eq!(ct, [0x21u8, 0x2A]);
 /// ```
 ///
 pub fn encrypt<W: Word>(pt: [W; 2], key: &Vec<u8>, rounds: usize) -> [W; 2] {
@@ -123,25 +116,20 @@ pub fn encrypt<W: Word>(pt: [W; 2], key: &Vec<u8>, rounds: usize) -> [W; 2] {
 
 ///
 /// Decrypts a ciphertext `ct` and returns a plaintext `pt`.
-/// The `ct` should have length 2 * w = 2 * bytes(W)
-///
-/// `W`: is the data type. Currently supported: u8, u16, u32, u64, u128
-/// `T`: is the key expansion length `T = 2 * (r + 1)` being r number of rounds.
-/// `T` should be even.
+/// The `ct` is an array of two words `W` (u8, u16, u32, u64, u128)
 ///
 /// Example:
 ///
 /// ```rust
 /// use rc5_cipher::decrypt;
 ///
-/// let key = vec![0x00, 0x01, 0x02, 0x03];
-/// let pt  = [0x00u8, 0x01];
-/// let ct  = [0x21u8, 0x2A];
 /// let rounds = 12;
+/// let key = vec![0x00, 0x01, 0x02, 0x03];
+/// let ct  = [0x21u8, 0x2A];
 ///
-/// let res = decrypt(ct, &key, rounds);
+/// let pt = decrypt(ct, &key, rounds);
 ///
-/// assert!(&pt[..] == &res[..]);
+/// assert_eq!(pt, [0x00u8, 0x01]);
 /// ```
 ///
 #[allow(arithmetic_overflow)]

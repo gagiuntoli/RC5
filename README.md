@@ -23,38 +23,40 @@
  ## Example: encryption
 
  ```rust
- use rc5_cipher::encode;
+ use rc5_cipher::encrypt;
 
+ let rounds = 12;
  let key = vec![
      0x00, 0x01, 0x02, 0x03, 0x04, 0x05, 0x06, 0x07, 0x08, 0x09, 0x0A, 0x0B, 0x0C, 0x0D,
      0x0E, 0x0F,
  ];
- let pt = vec![0x00, 0x11, 0x22, 0x33, 0x44, 0x55, 0x66, 0x77];
- let ct = vec![0x2D, 0xDC, 0x14, 0x9B, 0xCF, 0x08, 0x8B, 0x9E];
+ let pt = [0x33221100u32, 0x77665544];
 
- let res = encode::<u32, 26>(key, pt);
- assert_eq!(ct, res.unwrap());
+ let ct = encrypt(pt, &key, rounds);
+
+ assert_eq!(ct, [0x9B14DC2Du32, 0x9E8B08CF]);
  ```
 
  ## Example: decryption
 
  ```rust
- use rc5_cipher::decode;
+ use rc5_cipher::decrypt;
 
+ let rounds = 12;
  let key = vec![
      0x00, 0x01, 0x02, 0x03, 0x04, 0x05, 0x06, 0x07, 0x08, 0x09, 0x0A, 0x0B, 0x0C, 0x0D,
      0x0E, 0x0F,
  ];
- let pt = vec![0x00, 0x11, 0x22, 0x33, 0x44, 0x55, 0x66, 0x77];
- let ct = vec![0x2D, 0xDC, 0x14, 0x9B, 0xCF, 0x08, 0x8B, 0x9E];
+ let ct = [0x9B14DC2Du32, 0x9E8B08CF];
 
- let res = decode::<u32, 26>(key, ct);
- assert_eq!(pt, res.unwrap());
+ let pt = decrypt(ct, &key, rounds);
+
+ assert_eq!(pt, [0x33221100u32, 0x77665544]);
  ```
 
  ## Bibliography
 
  - Rivest original paper: https://www.grc.com/r&d/rc5.pdf
  - C implementation and tests: https://tools.ietf.org/id/draft-krovetz-rc6-rc5-vectors-00.html#rfc.section.4
- - Haskell implementation: https://hackage.haskell.org/package/cipher-rc5-0.1.1.2/docs/src/Crypto-Cipher-RC5.html
+ - Haskell implementation: https://hackage.haskell.org/package/cipher-rc5-0.1.2.2/docs/src/Crypto-Cipher-RC5.html
 
