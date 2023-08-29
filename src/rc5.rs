@@ -250,12 +250,14 @@ where
         let ix = (i / u) as usize;
         key_l[ix] = (key_l[ix].wrapping_shl(8u32)).wrapping_add(&W::from(key[i]));
     }
+    println!("L = {:2x?}", key_l);
 
     // initializing array S
     key_s[0] = W::P;
     for i in 1..=(T - 1) {
         key_s[i] = key_s[i - 1].wrapping_add(&W::Q);
     }
+    println!("S = {:2x?}", key_s);
 
     // Mixing in the secret key
     let mut i = 0;
@@ -280,16 +282,45 @@ where
 mod tests {
     use super::*;
 
-    // #[test]
-    // fn expand_key_a() {
-    //     let key = vec![0x00, 0x01, 0x02, 0x03];
-    //     let key_exp = expand_key::<u32, 4>(key);
+    #[test]
+    fn test_left_right_shift() {
+        let a = 0x77u8; // 0111 0111
 
-    //     assert_eq!(
-    //         &key_exp[..],
-    //         [0xbc13a1cf, 0xfeda18e9, 0x39252ff2, 0x57a51ad8]
-    //     );
-    // }
+        assert_eq!(rotl(a, 1u8), 0xeeu8);
+        assert_eq!(rotl(a, 7u8), 0xbbu8); // 1011 1011 = 0xbb
+        assert_eq!(rotl(a, 8u8), a);
+        assert_eq!(rotl(a, 2 * 8u8), a);
+        assert_eq!(rotl(a, 5 * 8u8), a);
+        assert_eq!(rotl(a, 1u8), 0xeeu8); // 1110 1110 = 0xee
+        assert_eq!(rotl(a, 7u8), 0xbbu8); // 1011 1011 = 0xbb
+        assert_eq!(rotr(a, 8u8), a);
+
+        assert_eq!(rotr(a, 1u8), 0xbbu8); // 1011 1011 = 0xbb
+        assert_eq!(rotr(a, 2u8), 0xddu8); // 1101 1101 = 0xdd
+        assert_eq!(rotr(a, 7u8), 0xeeu8); // 1110 1110 = 0xee
+        assert_eq!(rotr(a, 8u8), a);
+        assert_eq!(rotr(a, 8u8 + 1u8), 0xbbu8);
+        assert_eq!(rotr(a, 8u8 + 2u8), 0xddu8);
+        assert_eq!(rotr(a, 8u8 + 7u8), 0xeeu8);
+        assert_eq!(rotr(a, 2 * 8u8), a);
+        assert_eq!(rotr(a, 5 * 8u8), a);
+    }
+
+    #[test]
+    fn test_expand_key_a() {
+        let rounds = 12;
+        let key = vec![
+            0x00u8, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
+            0x00, 0x00,
+        ];
+        let key_exp = expand_key::<u32, 26>(key);
+
+        println!("key_exp = {:2x?}", key_exp);
+        // assert_eq!(
+        //     &key_exp[..],
+        //     [0xbc13a1cf, 0xfeda18e9, 0x39252ff2, 0x57a51ad8]
+        // );
+    }
 
     #[test]
     fn encode_fails_short_message() {

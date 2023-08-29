@@ -4,6 +4,7 @@ pub trait Unsigned:
     + num::traits::WrappingSub
     + num::traits::WrappingShl
     + num::traits::WrappingShr
+    + std::fmt::Debug
     + std::ops::BitAnd<Output = Self>
     + std::ops::BitOr<Output = Self>
     + std::ops::BitXor<Output = Self>
